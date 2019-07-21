@@ -7,71 +7,94 @@ import serial
 import tinyos
 
 
-listening = False
-task = None
-
-
-async def listen(callback, device, baudrate, sampling_rate):
+class Listener:
     '''
-    Listens for events on the specified device at the specified
-    rate.
-    Arguments:
-        callback: The callback to execute when an event occurs.
-        device: The device to listen for events on.
-        baudrate: The signalling rate of the connected device.
-        sampling_rate: The rate at which to sample events.
+    Implements an asynchronous event listener on a serial device.
+    
+    The Listener can be in one of three states:
+        ACTIVE
+        PAUSED
+        STOPPED
     '''
-    global listening
 
-    try:
-        # open the serial port on the specified device
-        ser = serial.Serial(device, baudrate=baudrate)
-        # wrap the serial device
-        sio = io.TextIOWrapper(io.BufferedWRPair(ser, ser))
-        while listening:
-            # read from the datastream
-            line = sio.readline()
-            # check if there was data
-            if line:
-                # call the callback function
-                callback(line)
-            # wait for the specified amount of time
-            await asyncio.sleep(1/sampling_rate)
-        # close the serial device
-        ser.close()
-    except SerialException:
-        listening = False
-        print('Unable to connect to serial device...')
+    # The various states that the listener can be in
+    ACTIVE = 0
+    PAUSED = 1
+    STOPPED = 2
+
+    def __init__(self, callback, device, baudrate, samplerate):
+        self._callback = callback
+        self._device = device
+        self._baudrate = baudrate
+        self._samplerate = samplerate
+        self._state = Listener.STOPPED
+        self._task = None
 
 
-async def start(callback, device, baudrate, sampling_rate):
-    '''
-    Starts listening for events on the specified device.
-    Arguments:
-        callback: The callback to execute when an event
-        occurs. Note that the callback must receive an
-        event object.
-        device: The device to listen on.
-        baudrate: The signalling rate of the connected device
-        sampling_rate: The rate at which samples are drawn.
-    '''
-    global task
+    async def _listen(self):
+        '''
+        Private method that defines the listening task.
+        '''
+        try:
+            # open the serial port on the specified device
+            ser = serial.Serial(self._device, baudrate=self._baudrate)
+            # wrap the serial device
+            sio = io.TextIOWrapper(io.BufferedWRPair(ser, ser))
+            while self._state != Listener.STOPPED:
+                # read from the datastream
+                line = sio.readline()
+                # check if there was data
+                if line:
+                    # call the callback function
+                    self._callback(line)
+                # wait for the specified amount of time
+                await asyncio.sleep(1/self._sampling_rate)
+            # close the serial device
+            ser.close()
+        except SerialException:
+            self._listening = False
+            print('Unable to connect to serial device...')
 
-    loop = asyncio.get_event_loop()
-    task = loop.crete_task(listen(callback, device, sampling_rate))
 
-    try:
-        loop.run_until_complete(task)
-    except asyncio.CancelledError:
-        pass
+    async def start(self):
+        '''
+        Starts listening for events.
+        '''
+        if self._state == Listener.STOPPED:
+            loop = asyncio.get_event_loop()
+            self._task = loop.create_task(listen())
+
+            try:
+                self._state = Listener.ACTIVE
+                loop.run_until_complete(self._task)
+            except asyncio.CancelledError:
+                pass
 
 
-async def stop():
-    '''
-    Stops the listener.
-    '''
-    global listening
-    global task
-
-    listening = False
-    task.cancel()
+    async def stop(self):
+        '''
+        Stops listening for events.
+        '''
+        if (self._state == Listener.ACTIVE or 
+                self._state == Listener.PAUSED):
+            await self._task.cancel()
+            self._state = Listener.STOPPED
+        
+        
+    def pause(self):
+        '''
+        Pauses listening for events.
+        '''
+        if self._state == Listener.ACTIVE:
+            self._state = Listener.PAUSED
+            
+    
+    def resume(self):
+        '''
+        Resumes listening for events.
+        '''
+        if self._state == Listener.PAUSED:
+            self._state = Listener.ACTIVE
+    
+    
+    def 
