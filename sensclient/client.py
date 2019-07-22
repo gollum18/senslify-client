@@ -15,7 +15,7 @@ def get_baudrate(baudrate):
     if br in Listener.RATES:
         return Listener.RATES[br]
     else:
-        return eval(br)
+        return int(br)
 
 
 def process_event(event):
@@ -65,11 +65,13 @@ def add_command(device, baudrate, samplerate):
                 process_event, 
                 device, 
                 get_baudrate(baudrate), 
-                eval(samplerate)
+                int(samplerate)
             )
             _listeners[device].start()
         except RuntimeError as e:
             click.echo(e)
+        except ValueError as e:
+            click.echo('Cannot add listener, invalid baudrate or sample rate entered!')
     else:
         click.echo('Cannot start Listener for device {}, there is already an active Listener for the device!'.format(device))
 
