@@ -11,11 +11,11 @@ The client software utilizes PySerial and the TinyOS Python support tools to pas
 
 
 ## Usage
-The client comes bundled with Setuptools support. All you have to install the client is to type `python3 setup.py install` in the projects root directory.
+The client comes bundled with Setuptools support. All you have to do to install the client is type `python3 setup.py install` in the projects root directory.
 
 To use the client, you can invoke it from the command line by typing `sdcp`. This will start the client shell.
 
-The first thing you'll want to do upon opening the client is to connect to a Senslify server. If you know the address of the server you want to connect to, type `server set [ADDR]`, where the address is the servers root address without any trailing path. Alternatively, you can specify a default server to connect by customizing the bundled config file.
+The first thing you'll want to do upon opening the client is to connect to a Senslify server. If you know the address of the server you want to connect to, type `server set [NUM]`, where [NUM] is the number displayed next to the server when typing `servers show`. These servers are specified in the configuration file bundled with the software.
 
 The list of commands for the client are as follows:
 + cls
@@ -27,8 +27,6 @@ The list of commands for the client are as follows:
     + start [DEVICE]
     + stop [DEVICE]
 + server
-    + add [URI]
-    + remove [NUM]
     + set [NUM]
     + show
     
