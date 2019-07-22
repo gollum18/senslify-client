@@ -1,8 +1,8 @@
-from client import run
+from sensclient.client import init
 
 
 def main():
-    run()
+    init()
 
 
 if __name__ == '__main__':
