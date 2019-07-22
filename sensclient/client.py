@@ -4,7 +4,7 @@ Defines a client for the Senslify web application.
 import aiohttp
 import click, click_shell as shell
 
-from listener import listen
+from listener import Listener
 
 
 # The server client - An aiohttp.ClientSession
@@ -13,7 +13,7 @@ _session = aiohttp.ClientSession()
 _devices = dict()
 
 
-def process_event(event, host):
+async def process_event(event, host):
     '''
     Defines a callback for processing events received from a listener.
     Arguments:
@@ -23,7 +23,10 @@ def process_event(event, host):
     global _session
 
     # upload the received data to the specified host
-    url = host + 'sensors/upload'
+    # url = host + 'sensors/upload'
+
+    # DEBUG
+    click.echo(event)
 
 
 @shell.command('pause')
@@ -37,9 +40,12 @@ def pause_command(device):
     global _devices
 
     if device in _devices:
-
+        if _devices[device].state() == Listener.ACTIVE:
+            _devices[device].pause()
+        else:
+            click.echo('Unable to pause Listener on device {}, Listener already paused or stopped!'.format(device))
     else:
-        click.echo('')
+        click.echo('Unable to pause listening on device {}, no Listener registered for device!')
 
 
 @shell.command('resume')
@@ -53,9 +59,12 @@ def resume_command(device):
     global _devices
 
     if device in _devices:
-
+        if _device[device].state() == Listener.PAUSED:
+            _device[device].resume()
+        else:
+            click.echo('Unable to resume listening on device {}, Listener is already running or stopped!'.format(device))
     else:
-        click.echo('')
+        click.echo('Unable to resume listening on device {}, no Listener registered for device!'.format(device))
 
 
 @shell.command('remove')
@@ -69,9 +78,11 @@ def remove_command(device):
     global _devices
 
     if device in _devices:
-
+        if _devices[device].state != Listener.STOPPED:
+            _devices[device].stop()
+        del _devices[device]
     else:
-        click.echo('')
+        click.echo('Unable to remove device {}, no Listener registered for device!'.format(device))
 
 
 @shell.command('add')
@@ -89,9 +100,14 @@ def add_command(device, baudrate, samplerate):
     global _devices
 
     if device not in _devices:
-
+        devices[device] = listener.Listener(
+            process_event,  # The callback to run when an event is generated
+            device,         # The endpoint for the device
+            baudrate,       # The actual sampling rate of the device
+            samplerate      # The rate at whcih samples are drawn (ms)
+        )
     else:
-        click.echo('Unable to start listener for {}, listener already active!'.format(device))
+        click.echo('Unable to start Listener for {}, Listener already active!'.format(device))
 
 
 @shell.command('show')
