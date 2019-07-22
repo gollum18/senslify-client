@@ -9,6 +9,15 @@ from sensclient.listener import Listener
 _event_lock = threading.Lock()
 
 
+def get_baudrate(baudrate):
+    br = baudrate.upper()
+    
+    if br in Listener.RATES:
+        return Listener.RATES[br]
+    else:
+        return eval(br)
+
+
 def process_event(event):
     '''
     Defines a thread-safe method for handling events from 
@@ -55,7 +64,7 @@ def add_command(device, baudrate, samplerate):
             _listeners[device] = Listener(
                 process_event, 
                 device, 
-                eval(baudrate), 
+                get_baudrate(baudrate), 
                 eval(samplerate)
             )
             _listeners[device].start()

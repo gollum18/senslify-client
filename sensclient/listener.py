@@ -25,9 +25,25 @@ class Listener(threading.Thread):
     cannot be restarted.
     '''
     
+    # Define the states for the state machine
     PAUSED = 0
     RUNNING = 1
     STOPPED = 2
+    
+    
+    # Define baudrates for official TinyOS devices
+    RATES = {
+        'TELOS':        115200,
+        'TELOSB':       115200,
+        'TMOTE':        115200,
+        'MICAZ':        57600,
+        'MICA2':        57600,
+        'IRIS':         57600,
+        'MICA2DOT':     19200,
+        'EYES':         115200,
+        'INTELMOTE2':   115200
+    }
+    
 
     def __init__(self, callback, device, baudrate, samplerate):
         '''
