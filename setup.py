@@ -22,7 +22,12 @@ VERSION = '0.1.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    "aiohttp", "click", "click_shell", "pyserial", "tinyos"
+    "aiohttp",      # Server support 
+    "click",        # CLI support
+    "click_shell",  # Shell support
+    "config",       # Configuration file support
+    "pyserial",     # Serial device support
+    "tinyos"        # TinyOS specific Python wrappers
 ]
 
 # What packages are optional?

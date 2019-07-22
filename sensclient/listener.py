@@ -130,7 +130,7 @@ class Listener(threading.Thread):
                 data = random.random()
                 self._callback(data)
                 if self._samplerate > 0:
-                    time.sleep(1/self._samplerate)
+                    time.sleep(self._samplerate/1000)
             elif self._state == Listener.PAUSED:
                 time.sleep(0)
         
