@@ -1,5 +1,21 @@
-import threading, time
-import random
+import threading, time, sys
+import tinyos
+
+
+# This code comes from the TinyOS oscilloscope application
+class OscilloscopeMsg (tinyos.tos.Packet):
+    '''
+    Defines a message that is read from the official TinyOS oscilloscope
+    application.
+    '''
+    def __init__(self, packet=None):
+        tinyos.tos.Packet.__init__(self,
+            [('version',  'int', 2),
+             ('interval', 'int', 2),
+             ('id',       'int', 2),
+             ('count',    'int', 2),
+             ('readings', 'blob', None)],
+            packet)
 
 
 class Listener(threading.Thread):
@@ -31,6 +47,14 @@ class Listener(threading.Thread):
     STOPPED = 2
     
     
+    # The rate at which the AM module is configured to send 
+    #   messages. This is application specific so only
+    #   the rate for the Oscilloscope application is defined
+    AM_RATES = {
+        'OSCIILLOSCOPE': 0x93
+    }
+    
+    
     # Define baudrates for official TinyOS devices
     RATES = {
         'TELOS':        115200,
@@ -45,7 +69,7 @@ class Listener(threading.Thread):
     }
     
 
-    def __init__(self, callback, device, baudrate, samplerate):
+    def __init__(self, callback, device, baudrate, amrate='OSCILLOSCOPE'):
         '''
         Returns a new instance of a Listener.
         Arguments:
@@ -53,7 +77,8 @@ class Listener(threading.Thread):
             received. The callback function should be thread-safe.
             device: The physical address of the device.
             baudrate: The sampling rate of the physical device.
-            samplerate: The rate to report events (ms).
+            amrate: The rate of transfer for the Active Messaging
+            module on the connected device.
         '''
         threading.Thread.__init__(self, daemon=True)
         self._callback = threading.local()
@@ -65,8 +90,8 @@ class Listener(threading.Thread):
         self._baudrate = threading.local()
         self._baudrate = baudrate
         
-        self._samplerate = threading.local()
-        self._samplerate = samplerate
+        self._amrate = threading.local()
+        self._amrate = amrate
         
         self._state = threading.local()
         self._state = Listener.PAUSED
@@ -124,13 +149,18 @@ class Listener(threading.Thread):
         Overridden from the Thread superclass. This function defines
         the logic of the Listeners state machine.
         '''
+        # Note that the tinyos specific code comes from the 
+        #   oscilloscope python application that ships with tos
+        am = tinyos.tos.AM()
+        
         while self._state != Listener.STOPPED:
             if self._state == Listener.RUNNING:
-                # TODO: Read in data from serial and pass to callback
-                data = random.random()
-                self._callback(data)
-                if self._samplerate > 0:
-                    time.sleep(self._samplerate/1000)
+                # read in the packet
+                p = am.read()
+                # check if there was a packet and we have an AM rate for it
+                if p and p.type == LISTENER.AM_RATES[self._amrate]:
+                    msg = OscilloscodeMsg(p.data)
+                    callback(msg)
             elif self._state == Listener.PAUSED:
                 time.sleep(0)
         
