@@ -1,5 +1,4 @@
 import threading, time, sys
-from tinyos3 import tos
     
     
 # Define the listener types
@@ -13,23 +12,34 @@ def create_listener(ltype, **kwargs):
     '''
     Defines a factory function for creating device listeners.
     '''
+    # perform checks on the callback and device
+    if 'callback' not in kwargs.keys():
+        raise KeyError
+    elif kwargs['callback'] is None:
+        raise ValueError
+    if 'device' not in kwargs.keys():
+        raise KeyError
+    elif kwargs['device'] is None:
+        raise ValueError
+    # get the callback and device
     callback = kwargs['callback']
     device = kwargs['device']
+    # create the correct listener based on type
+    listener = None
     if ltype == T_DUMMY:
-        return DummyListener(callback, 
-                                device)
+        listener = DummyListener(callback, device)
     elif ltype == T_SERIAL:
-        return SerialListener(callback, 
-                                device,
-                                kwargs['baudrate'])
+        baudrate = kwargs['baudrate']
+        listener = SerialListener(callback, device, baudrate)
     elif ltype == T_TINYOS:
-        return TinyOSListener(callback, 
-                                device, 
-                                kwargs['baudrate'], 
-                                kwargs['amrate'])
+        baudrate = kwargs['baudrate']
+        amrate = kwargs['amrate']
+        listener = TinyOSListener(callback, device, baudrate, amrate)
     elif ltype == T_BLUETOOTH:
-        return BluetoothListener(callback, 
-                                device)
+        listener = BluetoothListener(callback, device)
+    # start the listener
+    listener.start()
+    return listener
 
 
 class _Listener(threading.Thread):
@@ -74,7 +84,7 @@ class _Listener(threading.Thread):
     STOPPED = 2     # Listener is not running
 
 
-    def __init__(self, callback, device, baudrate, ltype):
+    def __init__(self, callback, device, ltype):
         '''
         Returns a new instance of a Listener.
         Arguments:
@@ -90,15 +100,12 @@ class _Listener(threading.Thread):
 
         self._device = threading.local()
         self._device = device
-
-        self._baudrate = threading.local()
-        self._baudrate = baudrate
         
         self._ltype = threading.local()
         self._ltype = ltype
 
         self._state = threading.local()
-        self._state = Listener.PAUSED
+        self._state = _Listener.PAUSED
 
 
     #
@@ -134,11 +141,11 @@ class _Listener(threading.Thread):
 
 
     def state_as_str(self):
-        if self._state == Listener.RUNNING:
+        if self._state == _Listener.RUNNING:
             return 'RUNNING'
-        elif self._state == Listener.PAUSED:
+        elif self._state == _Listener.PAUSED:
             return 'PAUSED'
-        elif self._state == Listener.STOPPED:
+        elif self._state == _Listener.STOPPED:
             return 'STOPPED'
         else:
             return 'NULL'
@@ -160,16 +167,14 @@ class _Listener(threading.Thread):
         Overridden from the Thread superclass. This function defines
         the logic of the Listeners state machine.
         '''
-        # Note that the tinyos specific code comes from the
-        #   oscilloscope python application that ships with tos
-        am = tos.AM()
 
-        while self._state != Listener.STOPPED:
-            if self._state != Listener.PAUSED:
+        while self._state != _Listener.STOPPED:
+            if self._state == _Listener.RUNNING:
                 # call the listen method to get data from the device
-                callback(listen())
+                event = self.listen()
+                self._callback(event)
                 
-            elif self._state == Listener.PAUSED:
+            elif self._state == _Listener.PAUSED:
                 time.sleep(0)
 
 
@@ -178,8 +183,8 @@ class _Listener(threading.Thread):
         Provides a method for resuming the listener, thereby
         continuing data collection.
         '''
-        if self.is_alive() and self._state == Listener.PAUSED:
-            self._state = Listener.RUNNING
+        if self.is_alive() and self._state == _Listener.PAUSED:
+            self._state = _Listener.RUNNING
 
 
     def pause(self):
@@ -187,8 +192,8 @@ class _Listener(threading.Thread):
         Provides a method for pausing the Listener, thereby halting
         data collection.
         '''
-        if self.is_alive() and self._state == Listener.RUNNING:
-            self._state = Listener.PAUSED
+        if self.is_alive() and self._state == _Listener.RUNNING:
+            self._state = _Listener.PAUSED
 
 
     def stop(self):
@@ -196,8 +201,8 @@ class _Listener(threading.Thread):
         Provides a method for stopping the Listener, thereby ending
         the backing daemon thread.
         '''
-        if self.is_alive() and self._state != Listener.STOPPED:
-            self._state = Listener.STOPPED
+        if self.is_alive() and self._state != _Listener.STOPPED:
+            self._state = _Listener.STOPPED
             
            
 class BluetoothListener(_Listener):
@@ -215,7 +220,7 @@ class BluetoothListener(_Listener):
             is read.
             device: The device mountpoint/endpoint.
         '''
-        super().__init__(self, callback, device, 0, ltype=T_BLUETOOTH)
+        _Listener.__init__(self, callback, device, T_BLUETOOTH)
             
             
     def listen(self):
@@ -228,8 +233,6 @@ class DummyListener(_Listener):
     Implements a dummy listener that returns random data to the
     listening client.
     '''
-    
-    from random import random
 
     def __init__(self, callback, device):
         '''
@@ -240,7 +243,7 @@ class DummyListener(_Listener):
             device: The device mountpoint/endpoint.
             baudrate: The baudrate of the serial connection.
         '''
-        super().__init__(callback, device, 0, ltype=T_DUMMY)
+        _Listener.__init__(self, callback, device, T_DUMMY)
         
 
     def listen(self):
@@ -248,6 +251,7 @@ class DummyListener(_Listener):
         Returns a random number in the range [0, 1) to the callback
         function.
         '''
+        from random import random
         return random()
             
             
@@ -267,21 +271,34 @@ class SerialListener(_Listener):
             baudrate: The baudrate of the serial connection.
         '''
         # Initialize the parent
-        super().__init__(self, callback, device, baudrate, ltype=T_SERIAL)
+        _Listener.__init__(self, callback, device, T_SERIAL)
+        
+        self._baudrate = threading.local()
+        self._baudrate = baudrate
+        
+        
+    def baudrate(self):
+        '''
+        Gets the baudrate of the serial device.
+        '''
+        return self._baudrate
         
         
     def listen(self):
+        '''
+        Listens for an event on a serial device.
+        '''
         # TODO: Implement listening over the serial interface
         pass
         
         
-class TinyOSListener(_Listener):
+class TinyOSListener(SerialListener):
     '''
     Implements a serial listener that returns data read in from
     a connected TinyOS serial device.
     '''
-            
-    from tos import am
+    
+    from tinyos3 import tos 
     
     #
     # DECLARE ANY TINYOS PACKET TYPES HERE
@@ -340,13 +357,15 @@ class TinyOSListener(_Listener):
             specific. The most common type is an Oscilloscope
             packet.
         '''
-        super().__init__(self, callback, device, baudrate, ltype=T_TINYOS)
+        SerialListener.__init__(self, callback, device, baudrate, T_TINYOS)
             
         _amrate = threading.local()
         _amrate = amrate
         
         _pkt_type = threading.local()
         _pkt_type = pkt_type
+        
+        self._am = tos.AM(s=device)
         
         
     def amrate(self):
@@ -370,9 +389,9 @@ class TinyOSListener(_Listener):
         TinyOS packet.
         '''
         # read in the packet
-        p = am.read()
+        p = self._am.read()
         # check if there was a packet and we have an AM rate for it
-        if p and p.type == LISTENER.AM_RATES[self._amrate]:
+        if p and p.type == _Listener.AM_RATES[self._amrate]:
             msg = self._pkt_type(p.data)
             callback(msg)
 

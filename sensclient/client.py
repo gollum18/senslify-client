@@ -61,7 +61,7 @@ def run():
     
     
 #
-# DEFINE CLIENT COMMAND GROUPS
+# DEFINES THE TOP LEVEL COMMAND GROUPS
 #
     
     
@@ -90,15 +90,11 @@ def server():
     
 
 #
-# DEFINE CONFIGURATION MANAGEMENT COMMANDS
+# DEFINES THE CONFIGURATION MANAGEMENT GROUP
 #    
 
-
 @config.command('add-device')
-@click.argument('device')
-@click.argument('baudrate')
-@click.argument('amrate')
-def config_add_server_command(device, baudrate, amrate):
+def config_add_device_command():
     pass
 
 
@@ -139,28 +135,103 @@ def config_load_command(filename):
 
 
 #
-# DEFINE DEVICE COMMANDS
+# DEFINES THE ADD DEVICE GROUP
 #
 
-
-def add_listener(device, listener):
+def add_listener(ltype, **kwargs):
     '''
     Adds the listener to the active listeners list.
     Argument:
-        device: The device corresponding to the listener.
-        listener: The listener corresponding to the device.
+        ltype: The type of listener to add.
+        kwargs: A dictionary containing keyword args passed to the function.
     '''
     global _listeners
     
+    if 'device' not in kwargs.keys() or not kwargs['device']:
+        click.secho('Unable to create Listener, no device specified!', fg='red', err=True)
+        pass
+    device = kwargs['device']
     if device not in _listeners:
-        _listeners[device] = listener
-        click.secho('Successfully added listener for device {}.'.format(device))
+        cl = None
+        # Try to create the listener, fail soft if theres an error
+        try:
+            cl = listener.create_listener(ltype=ltype, **kwargs)
+        except KeyError as e:
+            click.secho('Unable to add listener for device {}, invalid argument supplied!'.format(device), fg='red', err=True)
+        except ValueError as e:
+            click.secho('Unable to add listener for device {}, invalid argument supplied!'.format(device), fg='red', err=True)
+        # Make sure the listener was created, fail soft otherwise
+        if cl is None:
+            click.secho('Unable to add listener for device {}, there was an error creating the listener.'.format(device), fg='red', err=True)
+        else:
+            _listeners[device] = cl
+            click.secho('Successfully added listener for device {}.'.format(device), fg='green')
     else:
         click.secho('Unable to add listener for device {}, listener already exists for device!'.format(device), fg='red', err=True)
-
     
-# TODO: Implement the add device commands for the various device types
+    
+@devices.group('add')
+def devices_add():
+    '''
+    Adds a device for event listening.
+    '''
+    pass
+    
 
+@devices_add.command('dummy')
+@click.argument('device')
+def devices_add_dummy_command(device):
+    '''
+    [DEVICE] Adds a dummy device.
+    Arguments:
+        device: The device mount/end point.
+    '''
+    add_listener(listener.T_DUMMY, callback=process_event, device=device)
+
+
+@devices_add.command('serial')
+@click.argument('device')
+@click.argument('baudrate')
+def devices_add_serial_command(device, baudrate):
+    '''
+    [DEVICE BAUDRATE] Adds a serial device.
+    Arguments:
+        device: The device mount/end point.
+        baudrate: The baudrate of the serial device.
+    '''
+    add_listener(listener.T_SERIAL, callback=process_event, device=device, baudrate=baudrate)
+
+
+@devices_add.command('tos')
+@click.argument('device')
+@click.argument('baudrate')
+@click.argument('amrate')
+def devices_add_tos_command(device, baudrate, amrate):
+    '''
+    [DEVICE BAUDRATE AMRATE] Adds a TinyOS device.
+    Arguments:
+        device: The device mount/end point.
+        baudrate: The baudrate of the serial device.
+        amrate: The Active Messaging rate of the TinyOS application installed
+        on the device.
+    '''
+    add_listener(listener.T_TINYOS, callback=process_event, device=device, baudrate=baudrate, amrate=amrate)
+
+
+@devices_add.command('btooth')
+@click.argument('device')
+def devices_add_btooth_command(device):
+    '''
+    [DEVICE] Adds a bluetooth device.
+    Arguments:
+        device: The device mount/end point.
+    '''
+    add_listener(listener.T_BLUETOOTH, callback=process_event, device=device)
+
+
+#
+# DEFINES THE LISTENER CONTROL GROUP
+#
 
 @devices.command('pause')
 @click.argument('device')
@@ -174,7 +245,7 @@ def devices_pause_command(device):
     global _listeners
     
     if device in _listeners:
-        if _listeners[device] == Listener.RUNNING:
+        if _listeners[device] == listener._Listener.RUNNING:
             click.echo('Pausing Listener for device {}...'.format(device))
             _listeners[device].pause()
     else:
@@ -193,7 +264,7 @@ def devices_resume_command(device):
     global _listeners
     
     if device in _listeners:
-        if _listeners[device].state() == Listener.PAUSED:
+        if _listeners[device].state() == listener._Listener.PAUSED:
             click.echo('Resuming Listener for device {}...'.format(device))
             _listeners[device].resume()
         else:
@@ -201,26 +272,49 @@ def devices_resume_command(device):
     else:
         click.secho('Cannot resume Listener for device {}, no Listener registered for device!'.format(device), fg='red', err=True)
         
-        
-@devices.command('show')
-def devices_show_command():
-    global _listeners
+
+#
+# DEFINES THE SHOW DEVICE GROUP
+#
+
+@devices.group('show')
+def show_devices():
+    '''
+    Shows devices that with connected listeners.
+    '''
+    pass
     
-    if len(_listeners) > 0:
-        click.echo('-'*80)
-        click.echo('{:>15} {:>15} {:>15} {:>10}'.format('DEVICE', 'BAUDRATE', 'AMRATE', 'STATE'))
-        click.echo('-'*80)
-        # for some reason this is giving an error?
-        for _, listener in _listeners.items():
-            click.echo('{:>15} {:>15} {:>15} {:>10}'.format(
-                listener.device(), 
-                listener.baudrate(), 
-                listener.amrate(), 
-                listener.state_as_str()
-                )
-            )
-    else:
-        click.secho('Cannot show Listener status for connected devices, no devices registered!', fg='red', err=True)
+    
+@show_devices.command('dummy')
+def show_devices_dummy_command():
+    '''
+    Shows connected dummy devices.
+    '''
+    pass
+
+
+@show_devices.command('serial')
+def show_devices_serial_command():
+    '''
+    Shows connected serial devices.
+    '''
+    pass
+
+
+@show_devices.command('tos')
+def show_devices_tos_command():
+    '''
+    Shows connected TinyOS devices.
+    '''
+    pass
+
+
+@show_devices.command('btooth')
+def show_devices_btooth_command():
+    '''
+    Shows connected bluetooth devices.
+    '''
+    pass
 
 
 @devices.command('stop')
@@ -281,7 +375,7 @@ def server_show_handler():
 #
 
 
-@run.command('cls')
+@run.command('clear')
 def clear_command():
     '''
     Clears the terminal output.
@@ -314,21 +408,7 @@ def init():
     
     # load in the configuration file
     _config = read_config()
-    # TODO: This needs refactored so it calls the device add 
-    #   command directly
-    try:
-        for device in _config['devices']:
-            _listeners[device] = Listener(
-                process_event, 
-                device.device, 
-                get_baudrate(device.baudrate), 
-                int(device.amrate)
-            )
-            _listeners[device].start()
-    except RuntimeError as e:
-        click.secho(e, fg='red', err=True)
-    except ValueError:
-        click.secho('Cannot add listener for device {}, invalid baudrate or sample rate entered!'.format(device), fg='red', err=True)
+    # TODO: Add in default devices
     # register the cleanup function
     atexit.register(cleanup)
     
