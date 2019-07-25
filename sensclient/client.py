@@ -4,7 +4,7 @@ from click_shell import shell
 import atexit, os, threading
 
 from sensclient.configuration import read_config, write_config
-from sensclient.listener import Listener
+import sensclient.listener as listener
 
 
 # Used to make the event callback function thread-safe
@@ -35,8 +35,8 @@ def get_baudrate(baudrate):
     '''
     br = baudrate.upper()
     
-    if br in Listener.RATES:
-        return Listener.RATES[br]
+    if br in listener.TinyOSListener.RATES:
+        return listener.TinyOSListener.RATES[br]
     else:
         return int(br)
 
@@ -143,34 +143,23 @@ def config_load_command(filename):
 #
 
 
-@devices.command('add')
-@click.argument('device')
-@click.argument('baudrate')
-@click.argument('amrate')
-def devices_add_command(device, baudrate, amrate):
+def add_listener(device, listener):
     '''
-    Adds a device and starts listening on it.
-    Arguments:
-        device: The physical address of the device to start listening
-        on.
+    Adds the listener to the active listeners list.
+    Argument:
+        device: The device corresponding to the listener.
+        listener: The listener corresponding to the device.
     '''
     global _listeners
     
     if device not in _listeners:
-        try:
-            _listeners[device] = Listener(
-                process_event, 
-                device, 
-                get_baudrate(baudrate), 
-                int(amrate)
-            )
-            _listeners[device].start()
-        except RuntimeError as e:
-            click.secho(e, fg='red', err=True)
-        except ValueError:
-            click.secho('Cannot add listener for device {}, invalid baudrate or sample rate entered!'.format(device), fg='red', err=True)
+        _listeners[device] = listener
+        click.secho('Successfully added listener for device {}.'.format(device))
     else:
-        click.secho('Cannot start Listener for device {}, there is already an active Listener for the device!'.format(device), fg='red', err=True)
+        click.secho('Unable to add listener for device {}, listener already exists for device!'.format(device), fg='red', err=True)
+
+    
+# TODO: Implement the add device commands for the various device types
 
 
 @devices.command('pause')
