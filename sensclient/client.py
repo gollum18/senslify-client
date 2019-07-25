@@ -1,10 +1,9 @@
-import config
-
 import click
 from click_shell import shell
 
 import atexit, os, threading
 
+from sensclient.configuration import read_config, write_config
 from sensclient.listener import Listener
 
 
@@ -16,6 +15,7 @@ _listeners = dict()
 
 # Stores the configuration
 _config = None
+_config_file = None
 
 # Constant for the primary server
 PRIMARY = -1
@@ -41,13 +41,6 @@ def get_baudrate(baudrate):
         return int(br)
 
 
-def load_config(filename=os.path.dirname(os.path.abspath(__file__)) + '/sensclient.conf'):
-    '''
-    Loads the configuration file.
-    '''
-    return config.Config(filename)
-
-
 def process_event(event):
     '''
     Defines a thread-safe method for handling events from 
@@ -67,21 +60,94 @@ def run():
     pass
     
     
+#
+# DEFINE CLIENT COMMAND GROUPS
+#
+    
+    
+@run.group()
+def config():
+    '''
+    Defines commands for managing the servers configuration file.
+    '''
+    pass
+    
+    
 @run.group()
 def devices():
+    '''
+    Defines commands for managing the clients connected devices.
+    '''
     pass
     
     
 @run.group()
 def server():
+    '''
+    Defines commands for managing the servers in use by the client.
+    '''
     pass
+    
+
+#
+# DEFINE CONFIGURATION MANAGEMENT COMMANDS
+#    
+
+
+@config.command('add-device')
+@click.argument('device')
+@click.argument('baudrate')
+@click.argument('amrate')
+def config_add_server_command(device, baudrate, amrate):
+    pass
+
+
+@config.command('remove-device')
+@click.argument('device')
+def config_remove_device(device):
+    pass
+
+    
+@config.command('add-server')
+@click.argument('server')
+def config_add_server_command(server):
+    pass
+
+
+@config.command('remove-server')  
+@click.argument('server')  
+def config_remove_server_command(server):
+    pass
+
+
+@config.command('set-primary-server')
+@click.argument('server')
+def config_set_primary_server_command(server):
+    pass
+    
+    
+@config.command('create')
+@click.argument('filename')
+def config_create_command(filename):
+    pass
+
+
+@config.command('load')
+@click.argument('filename')
+def config_load_command(filename):
+    pass
+
+
+#
+# DEFINE DEVICE COMMANDS
+#
 
 
 @devices.command('add')
 @click.argument('device')
 @click.argument('baudrate')
-@click.argument('samplerate')
-def devices_add_command(device, baudrate, samplerate):
+@click.argument('amrate')
+def devices_add_command(device, baudrate, amrate):
     '''
     Adds a device and starts listening on it.
     Arguments:
@@ -96,7 +162,7 @@ def devices_add_command(device, baudrate, samplerate):
                 process_event, 
                 device, 
                 get_baudrate(baudrate), 
-                int(samplerate)
+                int(amrate)
             )
             _listeners[device].start()
         except RuntimeError as e:
@@ -153,14 +219,14 @@ def devices_show_command():
     
     if len(_listeners) > 0:
         click.echo('-'*80)
-        click.echo('{:>15} {:>15} {:>15} {:>10}'.format('DEVICE', 'BAUDRATE', 'SAMPLERATE', 'STATE'))
+        click.echo('{:>15} {:>15} {:>15} {:>10}'.format('DEVICE', 'BAUDRATE', 'AMRATE', 'STATE'))
         click.echo('-'*80)
         # for some reason this is giving an error?
         for _, listener in _listeners.items():
             click.echo('{:>15} {:>15} {:>15} {:>10}'.format(
                 listener.device(), 
                 listener.baudrate(), 
-                listener.samplerate(), 
+                listener.amrate(), 
                 listener.state_as_str()
                 )
             )
@@ -187,9 +253,14 @@ def devices_stop_command(device):
         click.secho('Cannot stop Listener for device {}, no Listener registered!'.format(device), fg='red', err=True)
 
 
+#
+# DEFINE SET COMMANDS
+#
+
+
 @server.command('set')
 @click.argument('num')
-def server_set_handler(num):
+def server_set_command(num):
     global _config
 
     if (num == -1 or 
@@ -216,12 +287,22 @@ def server_show_handler():
             click.echo('* ({}) {}'.format(i, _config['servers']['secondary'][i]))
 
 
+#
+# DEFINE MISC COMMANDS
+#
+
+
 @run.command('cls')
 def clear_command():
     '''
     Clears the terminal output.
     '''
     click.clear()
+
+
+#
+# CLIENT FUNCTIONS
+#
 
 
 def cleanup():
@@ -243,7 +324,7 @@ def init():
     global _listeners
     
     # load in the configuration file
-    _config = load_config()
+    _config = read_config()
     # TODO: This needs refactored so it calls the device add 
     #   command directly
     try:
@@ -252,7 +333,7 @@ def init():
                 process_event, 
                 device.device, 
                 get_baudrate(device.baudrate), 
-                int(device.samplerate)
+                int(device.amrate)
             )
             _listeners[device].start()
     except RuntimeError as e:

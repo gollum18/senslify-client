@@ -1,4 +1,5 @@
 from sensclient.client import init
+import os, sys
 
 
 def main():

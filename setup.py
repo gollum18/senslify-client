@@ -22,18 +22,24 @@ VERSION = '0.1.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    "aiohttp",      # Server support 
+    "aiohttp",      # Server support
     "click",        # CLI support
     "click_shell",  # Shell support
-    "config",       # Configuration file support
-    "pyserial",     # Serial device support
-    "tinyos"        # TinyOS specific Python wrappers
+    "pyserial",     # Serial device support, needed by the TinyOS tools
+    "simplejson",   # Configuration file management
+    "tinyos3"       # TinyOS specific Python wrappers (Python3)
 ]
 
 # What packages are optional?
 EXTRAS = {
     # 'fancy feature': ['django'],
 }
+
+# What testing suite and requires are necessary?
+TEST_SUITE = 'nose.collector'
+TESTS_REQUIRE = [
+    "nose"
+]
 
 # The rest you shouldn't have to touch too much :)
 # ------------------------------------------------
@@ -117,6 +123,8 @@ setup(
     },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
+    test_suite=TEST_SUITE,
+    tests_require=TESTS_REQUIRE,
     include_package_data=True,
     license='MIT',
     classifiers=[
