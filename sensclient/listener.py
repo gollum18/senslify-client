@@ -6,6 +6,7 @@ T_DUMMY     = 0 # Listener type for generating dummy events
 T_SERIAL    = 1 # Listener type for generic serial devices
 T_TINYOS    = 2 # Listener type for TinyOS specific devices
 T_BLUETOOTH = 3 # Listener type for bluetooth devices
+T_PIPE      = 4 # Listener type for file pipes
 
 
 def create_listener(ltype, **kwargs):
@@ -253,6 +254,27 @@ class DummyListener(_Listener):
         '''
         from random import random
         return random()
+        
+
+class PipeListener(_Listener):
+    '''
+    Implements a Listener that reads data from a pipe.
+    '''
+    def __init__(self, callback, device, filepath):
+        '''
+        Returns an instance of the PipeListener class.
+        Arguments:
+            callback: The callback function to execute when data
+            is read.
+            device: The device mountpoint/endpoint.
+            filepath: The path of the file to pipe data from.
+        '''
+        _Listener.__init__(self, callback, device, T_PIPE)
+        
+    
+    def listen(self):
+        # TODO: Implement listening over a pipe
+        pass
             
             
 class SerialListener(_Listener):
